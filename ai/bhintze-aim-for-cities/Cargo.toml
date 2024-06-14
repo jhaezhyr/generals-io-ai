@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 model = {path = "../../model"}
 itertools = "0.10"
+strum = "0.24"
+strum_macros = "0.24"
 
 axum.workspace = true
 axum.features = ["json"]

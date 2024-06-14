@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
+    fmt::Display,
     net::SocketAddr,
 };
 
@@ -8,10 +9,23 @@ use itertools::{self, Itertools};
 
 use axum::{routing::post, Json, Router};
 use model::{Coordinate, Space, TurnRequest, TurnResponse, BOARD_SIZE};
+use strum_macros::Display;
 
 trait CoordinateExtras {
     fn neighbors(&self, board_size: usize) -> Vec<Coordinate>;
     fn distance(&self, other: &Coordinate) -> i32;
+}
+
+#[repr(i32)]
+#[derive(Display, PartialEq, Eq, PartialOrd, Ord)]
+enum TargetPriority {
+    Mountain = -1,
+    MyTile = 0,
+    EmptyTile = 1,
+    EnemyTile = 2,
+    EmptyTower = 3,
+    EnemyTower = 4,
+    EnemyCapital = 5,
 }
 
 impl CoordinateExtras for Coordinate {
@@ -130,64 +144,69 @@ where
 }
 
 async fn turn_handler(Json(body): Json<TurnRequest>) -> Json<Option<TurnResponse>> {
-    let strengths_of_my_spaces: Vec<_> = (0..BOARD_SIZE)
+    let priorities_and_strengths_of_targets: Vec<_> = (0..BOARD_SIZE)
         .flat_map(|x| (0..BOARD_SIZE).map(move |y| Coordinate { x, y }))
-        .flat_map(|c| {
-            if body.spaces[c.x][c.y].owner() == Some(body.player) {
-                Some((c, body.spaces[c.x][c.y].get_units()))
-            } else {
-                None
+        .map(|c| match body.spaces[c.x][c.y] {
+            Space::NeutralTown { units } => (c, TargetPriority::EmptyTower, units),
+            Space::PlayerTown { owner, units } => {
+                if owner == body.player {
+                    (c, TargetPriority::MyTile, units)
+                } else {
+                    (c, TargetPriority::EnemyTower, units)
+                }
+            }
+
+            Space::PlayerCapital { owner, units } => {
+                if owner == body.player {
+                    (c, TargetPriority::MyTile, units)
+                } else {
+                    (c, TargetPriority::EnemyCapital, units)
+                }
+            }
+
+            Space::Mountain => (c, TargetPriority::Mountain, 10000),
+            Space::Empty => (c, TargetPriority::EmptyTile, 0),
+            Space::PlayerEmpty { owner, units } => {
+                if owner == body.player {
+                    (c, TargetPriority::MyTile, units)
+                } else {
+                    (c, TargetPriority::EnemyTile, units)
+                }
             }
         })
         .sorted_by(|lh, rh| rh.1.cmp(&lh.1))
         .collect();
-    let priorities_of_targets: Vec<_> = (0..BOARD_SIZE)
-        .flat_map(|x| (0..BOARD_SIZE).map(move |y| Coordinate { x, y }))
-        .map(|c| {
-            (
-                c,
-                match body.spaces[c.x][c.y] {
-                    Space::NeutralTown { units: _ } => 3,
-                    Space::PlayerTown { owner, units: _ } => {
-                        if owner == body.player {
-                            0
-                        } else {
-                            4
-                        }
-                    }
-
-                    Space::PlayerCapital { owner, units: _ } => {
-                        if owner == body.player {
-                            0
-                        } else {
-                            5
-                        }
-                    }
-
-                    Space::Mountain => -1,
-                    Space::Empty => 1,
-                    Space::PlayerEmpty { owner, units: _ } => {
-                        if owner == body.player {
-                            0
-                        } else {
-                            2
-                        }
-                    }
-                },
-            )
-        })
-        .sorted_by(|lh, rh| rh.1.cmp(&lh.1))
-        .collect();
-    if let Some(target) = priorities_of_targets.first() {
-        println!("targetspace={}, priority={}", target.0, target.1);
-        if let Some(loc_of_biggest_army) = strengths_of_my_spaces.first() {
+    if let Some((target_loc, target_priority, target_units)) =
+        priorities_and_strengths_of_targets.first()
+    {
+        println!("targetspace={}, priority={}", target_loc, target_priority);
+        let strengths_of_my_spaces: Vec<_> = (0..BOARD_SIZE)
+            .flat_map(|x| (0..BOARD_SIZE).map(move |y| Coordinate { x, y }))
+            .flat_map(|c| {
+                if body.spaces[c.x][c.y].owner() == Some(body.player) {
+                    Some((c, body.spaces[c.x][c.y].get_units()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let closest_army_that_is_big_enough = strengths_of_my_spaces
+            .iter()
+            .filter(|(_, u)| u > target_units)
+            .sorted_by(|lh, rh| lh.0.distance(&target_loc).cmp(&rh.0.distance(&target_loc)))
+            .next();
+        let biggest_army = strengths_of_my_spaces
+            .iter()
+            .sorted_by(|lh, rh| rh.1.cmp(&lh.1))
+            .next();
+        if let Some(loc_of_biggest_army) = closest_army_that_is_big_enough.or(biggest_army) {
             println!(
                 "biggestarmy={}, size={}",
                 loc_of_biggest_army.0, loc_of_biggest_army.1
             );
             if let Some(next_steps) = a_star(
                 loc_of_biggest_army.0,
-                target.0,
+                *target_loc,
                 BOARD_SIZE.try_into().unwrap(),
                 |c: &Coordinate| -> bool {
                     match body.spaces[c.x][c.y] {
