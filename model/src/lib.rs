@@ -1,8 +1,10 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 pub const BOARD_SIZE: usize = 20;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash)]
 pub struct Coordinate {
     pub x: usize,
     pub y: usize,
@@ -38,6 +40,11 @@ impl Coordinate {
             })
         }
         surrounding
+    }
+}
+impl Display for Coordinate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!("({},{})", self.x, self.y))
     }
 }
 
