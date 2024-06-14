@@ -68,31 +68,67 @@ async fn turn_handler(
         .collect_vec();
     border_spaces.shuffle(&mut thread_rng());
 
+    let initial_weight = (usize::MAX, usize::MAX, usize::MAX, usize::MAX);
+
     let mut least_moves = (
-        usize::MAX,
+        initial_weight,
         Coordinate { x: 0, y: 0 },
         Coordinate { x: 0, y: 0 },
     );
-    for my_space in my_spaces_with_units {
+    for my_space in &my_spaces_with_units {
         for their_space in &border_spaces {
             let my_units = body.spaces[my_space.x][my_space.y].get_units();
             let their_units = body.spaces[their_space.x][their_space.y].get_units();
             if my_units > their_units {
                 let (distance, path) = cache
-                    .entry((my_space, *their_space))
-                    .or_insert_with(|| distance(my_space, *their_space, body.spaces));
-                if *distance < least_moves.0 {
-                    least_moves = (*distance, my_space, path[1]);
+                    .entry((*my_space, *their_space))
+                    .or_insert_with(|| distance(*my_space, *their_space, body.spaces));
+
+                let weight = {
+                    let target_priority = match body.spaces[their_space.x][their_space.y] {
+                        Space::PlayerCapital { .. } => 1,
+                        Space::PlayerTown { .. } => 2,
+                        Space::NeutralTown { .. } => 3,
+                        Space::PlayerEmpty { .. } => 4,
+                        Space::Empty => 5,
+                        Space::Mountain => unreachable!(),
+                    };
+                    (
+                        target_priority,
+                        *distance,
+                        usize::MAX - their_units,
+                        usize::MAX - my_units,
+                    )
+                };
+
+                if weight < least_moves.0 {
+                    least_moves = (weight, *my_space, path[1]);
                 }
             }
         }
     }
 
-    if least_moves.0 != usize::MAX {
+    if least_moves.0 != initial_weight {
         Json(Some(TurnResponse {
             from: least_moves.1,
             to: least_moves.2,
         }))
+    } else if !my_spaces_with_units.is_empty() {
+        Json(
+            my_spaces_with_units
+                .into_iter()
+                .choose(&mut thread_rng())
+                .map(|from| {
+                    let to = from
+                        .surrounding()
+                        .into_iter()
+                        .filter(|to| body.spaces[to.x][to.y] != Space::Mountain)
+                        .choose(&mut thread_rng())
+                        .expect("Should always be a path out of a space");
+
+                    TurnResponse { from, to }
+                }),
+        )
     } else {
         Json(None)
     }
