@@ -182,8 +182,8 @@ impl GameState {
             if let Some((owner, source_units)) = moves.first() {
                 let defending_units = self.spaces[dest.x][dest.y].get_units();
 
-                if defending_units + 1 < *source_units {
-                    let remaining_units = source_units - (defending_units + 1);
+                if defending_units < *source_units {
+                    let remaining_units = source_units - (defending_units);
                     // Attacker wins
                     self.spaces[dest.x][dest.y] = match self.spaces[dest.x][dest.y] {
                         Space::PlayerCapital { .. } => Space::PlayerCapital {
