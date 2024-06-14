@@ -67,7 +67,10 @@ async fn main() {
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-        println!("Starting server at http://{}", listener.local_addr().unwrap());
+        println!(
+            "Starting server at http://{}",
+            listener.local_addr().unwrap()
+        );
         axum::serve(
             listener,
             Router::new()
