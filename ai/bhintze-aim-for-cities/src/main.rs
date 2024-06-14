@@ -174,7 +174,10 @@ async fn turn_handler(Json(body): Json<TurnRequest>) -> Json<Option<TurnResponse
                 }
             }
         })
-        .sorted_by(|lh, rh| rh.1.cmp(&lh.1))
+        .sorted_by(|lh, rh| match rh.1.cmp(&lh.1) {
+            Ordering::Equal => rh.2.cmp(&lh.2),
+            x => x,
+        })
         .collect();
     if let Some((target_loc, target_priority, target_units)) =
         priorities_and_strengths_of_targets.first()
