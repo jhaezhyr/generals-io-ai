@@ -40,10 +40,8 @@ async fn handle_socket(mut socket: WebSocket, mut reciever: Receiver<GameState>)
         if socket
             .send(Message::Text(serde_json::to_string(&message).unwrap()))
             .await
-            .is_ok()
+            .is_err()
         {
-            println!("Sent message to websocket");
-        } else {
             println!("Unable to send ws message, closing socket");
             return;
         }
@@ -66,14 +64,15 @@ async fn main() {
     let websocket_sender = game_state_sender.clone();
 
     tokio::spawn(async move {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
+        println!("Starting server at http://{}", listener.local_addr().unwrap());
         axum::serve(
             listener,
             Router::new()
                 .route("/spectate", get(ws_handler))
-                .fallback_service(ServeDir::new("data"))
+                .fallback_service(ServeDir::new("game/data"))
                 .with_state(websocket_sender),
         )
         .await
