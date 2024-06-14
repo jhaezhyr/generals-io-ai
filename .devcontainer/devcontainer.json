@@ -1,0 +1,11 @@
+{
+    "name": "Generals-io-ai",
+    "dockerComposeFile": [
+        "./docker-compose.yml",
+        "./docker-compose.extend.yml"
+    ],
+    "service": "game-server",
+    "workspaceFolder": "/workspace/",
+    "shutdownAction": "stopCompose",
+    "remoteUser": "theGeneral"
+}
