@@ -1,7 +1,7 @@
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
 };
 
 use itertools::{self, Itertools};
@@ -221,7 +221,10 @@ async fn main() {
         .parse()
         .expect("First argument should be a valid port");
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let host = std::env::var("HOST_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ip: IpAddr = host.parse().expect("Invalid IP address");
+
+    let addr = SocketAddr::from((ip, port));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     axum::serve(listener, Router::new().route("/", post(turn_handler)))

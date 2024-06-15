@@ -1,8 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use std::process;
-use std::{net::SocketAddr, time::Duration};
-
+use std::{net::{SocketAddr,IpAddr}, time::Duration};
 use ai::Ai;
 use axum::{
     extract::{
@@ -74,7 +73,10 @@ async fn main() {
             .and_then(|val| val.parse().ok())
             .unwrap_or(0); // Default to port 0 if FORCE_PORT is not set or invalid
 
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        let host = std::env::var("HOST_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let ip: IpAddr = host.parse().expect("Invalid IP address");
+        
+        let addr = SocketAddr::from((ip, port));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
         println!(
