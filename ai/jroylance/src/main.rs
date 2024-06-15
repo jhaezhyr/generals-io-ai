@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use axum::{routing::post, Json, Router};
 use model::{Coordinate, Space, TurnRequest, TurnResponse, BOARD_SIZE};
@@ -66,7 +66,10 @@ async fn main() {
         .parse()
         .expect("First argument should be a valid port");
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let host = std::env::var("HOST_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ip: IpAddr = host.parse().expect("Invalid IP address");
+
+    let addr = SocketAddr::from((ip, port));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     axum::serve(listener, Router::new().route("/", post(turn_handler)))

@@ -1,7 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
-use std::{net::SocketAddr, time::Duration};
-
+use std::process;
+use std::{net::{SocketAddr,IpAddr}, time::Duration};
 use ai::Ai;
 use axum::{
     extract::{
@@ -52,10 +52,14 @@ async fn handle_socket(mut socket: WebSocket, mut reciever: Receiver<GameState>)
 
 #[tokio::main]
 async fn main() {
-    let players = std::env::args()
+    let players: Vec<Ai> = std::env::args()
         .skip(1)
         .map(|arg| Ai::from_arg(&arg))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|err| {
+            eprintln!("Error: {}", err);
+            process::exit(1);
+        });
 
     let mut game_state = GameState::new(players.len());
 
@@ -64,7 +68,15 @@ async fn main() {
     let websocket_sender = game_state_sender.clone();
 
     tokio::spawn(async move {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let port: u16 = std::env::var("FORCE_PORT")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(0); // Default to port 0 if FORCE_PORT is not set or invalid
+
+        let host = std::env::var("HOST_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let ip: IpAddr = host.parse().expect("Invalid IP address");
+        
+        let addr = SocketAddr::from((ip, port));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
         println!(
