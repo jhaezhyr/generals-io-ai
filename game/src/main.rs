@@ -1,5 +1,6 @@
 #![allow(clippy::needless_range_loop)]
 
+use std::process;
 use std::{net::SocketAddr, time::Duration};
 
 use ai::Ai;
@@ -52,10 +53,14 @@ async fn handle_socket(mut socket: WebSocket, mut reciever: Receiver<GameState>)
 
 #[tokio::main]
 async fn main() {
-    let players = std::env::args()
+    let players: Vec<Ai> = std::env::args()
         .skip(1)
         .map(|arg| Ai::from_arg(&arg))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|err| {
+            eprintln!("Error: {}", err);
+            process::exit(1);
+        });
 
     let mut game_state = GameState::new(players.len());
 
@@ -67,7 +72,10 @@ async fn main() {
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-        println!("Starting server at http://{}", listener.local_addr().unwrap());
+        println!(
+            "Starting server at http://{}",
+            listener.local_addr().unwrap()
+        );
         axum::serve(
             listener,
             Router::new()
