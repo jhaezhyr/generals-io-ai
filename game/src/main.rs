@@ -69,7 +69,12 @@ async fn main() {
     let websocket_sender = game_state_sender.clone();
 
     tokio::spawn(async move {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let port: u16 = std::env::var("FORCE_PORT")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(0); // Default to port 0 if FORCE_PORT is not set or invalid
+
+        let addr = SocketAddr::from(([127, 0, 0, 1], port));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
         println!(
